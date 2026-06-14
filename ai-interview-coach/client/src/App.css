@@ -1,0 +1,76 @@
+body {
+  margin: 0;
+  background: #f4f7fb;
+  font-family: Arial, sans-serif;
+  color: #111827;
+}
+
+.app {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.card {
+  background: white;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+h1 {
+  text-align: center;
+  font-size: 52px;
+  margin-bottom: 30px;
+}
+
+textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  padding: 14px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.message {
+  text-align: center;
+  color: #6b7280;
+}
+
+.summary-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stats-card {
+  flex: 1;
+}
