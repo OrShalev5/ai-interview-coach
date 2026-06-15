@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+
 type Props = {
   question: string;
   currentQuestion: number;
@@ -17,6 +19,83 @@ function InterviewQuestion({
   nextQuestion,
   isLastQuestion,
 }: Props) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(120);
+
+  useEffect(() => {
+    setTimeLeft(120);
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentQuestion]);
+
+const speakQuestion = () => {
+  window.speechSynthesis.cancel();
+
+  const speech = new SpeechSynthesisUtterance(question);
+  const voices = window.speechSynthesis.getVoices();
+
+  const voice =
+    voices.find((v) => v.name.includes("Aria")) ||
+    voices.find((v) => v.name.includes("Jenny")) ||
+    voices.find((v) => v.name.includes("Google US English")) ||
+    voices.find((v) => v.lang === "en-US");
+
+  if (voice) {
+    speech.voice = voice;
+  }
+
+  speech.lang = "en-US";
+  speech.rate = 0.9;
+  speech.pitch = 1.05;
+  speech.volume = 1;
+
+  window.speechSynthesis.speak(speech);
+};
+  const startRecording = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    setIsRecording(true);
+    recognition.start();
+
+    recognition.onresult = (event: any) => {
+      const spokenText = event.results[0][0].transcript;
+      setAnswer(answer ? `${answer} ${spokenText}` : spokenText);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      alert(`Could not record your answer: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+  };
+
   return (
     <div
       style={{
@@ -30,6 +109,8 @@ function InterviewQuestion({
       <p>
         Question {currentQuestion} of {totalQuestions}
       </p>
+
+      <p>⏱️ Time Remaining: {timeLeft}s</p>
 
       <div
         style={{
@@ -52,6 +133,15 @@ function InterviewQuestion({
       </div>
 
       <h2>{question}</h2>
+
+      <button onClick={speakQuestion}>Read Question Aloud</button>
+
+      <button onClick={startRecording} disabled={isRecording}>
+        {isRecording ? "🎤 Listening..." : "Start Recording"}
+      </button>
+
+      <br />
+      <br />
 
       <textarea
         rows={6}

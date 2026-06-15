@@ -1,108 +1,201 @@
-const express = require("express");
-const cors = require("cors");
-const multer = require("multer");
+import { useState, useEffect } from "react";
 
-require("dotenv").config();
+type Props = {
+  question: string;
+  currentQuestion: number;
+  totalQuestions: number;
+  answer: string;
+  setAnswer: (value: string) => void;
+  nextQuestion: () => void;
+  isLastQuestion: boolean;
+  language: "en" | "he";
+};
 
-const app = express();
+function InterviewQuestion({
+  question,
+  currentQuestion,
+  totalQuestions,
+  answer,
+  setAnswer,
+  nextQuestion,
+  isLastQuestion,
+  language,
+}: Props) {
+  const [isRecording, setIsRecording] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(120);
 
-app.use(cors());
-app.use(express.json());
+  useEffect(() => {
+    setTimeLeft(120);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-const upload = multer({ storage });
+    return () => clearInterval(timer);
+  }, [currentQuestion]);
 
-app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "Server is running!",
-  });
-});
+  const speakQuestion = () => {
+    window.speechSynthesis.cancel();
 
-app.post("/api/upload-cv", upload.single("cv"), (req, res) => {
-  res.json({
-    success: true,
-    fileName: req.file.filename,
-  });
-});
+    const speech = new SpeechSynthesisUtterance(question);
+    const voices = window.speechSynthesis.getVoices();
 
-app.post("/api/generate-questions", async (req, res) => {
-  const { jobDescription } = req.body;
+    const voice =
+      language === "he"
+        ? voices.find((v) => v.lang.includes("he")) ||
+          voices.find((v) => v.name.includes("Hebrew"))
+        : voices.find((v) => v.name.includes("Aria")) ||
+          voices.find((v) => v.name.includes("Jenny")) ||
+          voices.find((v) => v.lang === "en-US");
 
-  const hasJobDescription =
-    jobDescription && jobDescription.trim().length > 0;
+    if (voice) {
+      speech.voice = voice;
+    }
 
-  const questions = hasJobDescription
-    ? `1. Tell me about yourself and why this role interests you.
-2. Which skills from your CV match this job description?
-3. Describe a React project you built.
-4. How would you use Node.js and Express in this role?
-5. What experience do you have with MySQL?
-6. What parts of this job description are you strongest in?
-7. What would you need to learn for this role?
-8. Describe a challenge you faced in a project.
-9. How do you handle deadlines and feedback?
-10. Why should this company hire you?`
-    : `1. Tell me about yourself.
-2. Why do you want to become a Full Stack Developer?
-3. Explain a React project you built.
-4. How do you connect React to Node.js?
-5. What is Express used for?
-6. How do you work with MySQL?
-7. Describe a challenge you had in a project.
-8. How do you handle errors in an API?
-9. What are your strengths as a junior developer?
-10. Why should we hire you?`;
+    speech.lang = language === "he" ? "he-IL" : "en-US";
+    speech.rate = language === "he" ? 0.85 : 0.9;
+    speech.pitch = 1;
+    speech.volume = 1;
 
-  res.json({
-    success: true,
-    questions,
-  });
-});
+    window.speechSynthesis.speak(speech);
+  };
 
-app.post("/api/evaluate-interview", async (req, res) => {
-  const { questions, answers } = req.body;
+  const startRecording = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
-  const detailedFeedback = questions.map((question, index) => {
-    const answer = answers[index] || "";
-    const score = answer.length > 120 ? 9 : answer.length > 50 ? 7 : 4;
+    if (!SpeechRecognition) {
+      alert(
+        language === "he"
+          ? "זיהוי דיבור לא נתמך בדפדפן הזה."
+          : "Speech recognition is not supported in this browser."
+      );
+      return;
+    }
 
-    return {
-      question,
-      answer,
-      score,
-      strengths:
-        answer.length > 50
-          ? ["Clear answer", "Good effort", "Relevant response"]
-          : ["You attempted the question"],
-      improvements:
-        answer.length > 50
-          ? ["Add more specific examples", "Explain your technical decisions"]
-          : ["Write a fuller answer", "Use examples from your projects"],
+    const recognition = new SpeechRecognition();
+
+    recognition.lang = language === "he" ? "he-IL" : "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    setIsRecording(true);
+    recognition.start();
+
+    recognition.onresult = (event: any) => {
+      const spokenText = event.results[0][0].transcript;
+      setAnswer(answer ? `${answer} ${spokenText}` : spokenText);
     };
-  });
 
-  const averageScore =
-    detailedFeedback.reduce((sum, item) => sum + item.score, 0) /
-    detailedFeedback.length;
+    recognition.onerror = (event: any) => {
+      alert(
+        language === "he"
+          ? `לא הצלחתי להקליט: ${event.error}`
+          : `Could not record your answer: ${event.error}`
+      );
+    };
 
-  res.json({
-    success: true,
-    averageScore: averageScore.toFixed(1),
-    detailedFeedback,
-  });
-});
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+  };
 
-const PORT = 5000;
+  return (
+    <div
+      style={{
+        marginTop: "30px",
+        border: "1px solid #ddd",
+        padding: "20px",
+        borderRadius: "12px",
+        textAlign: language === "he" ? "right" : "left",
+        direction: language === "he" ? "rtl" : "ltr",
+      }}
+    >
+      <p>
+        {language === "he"
+          ? `שאלה ${currentQuestion} מתוך ${totalQuestions}`
+          : `Question ${currentQuestion} of ${totalQuestions}`}
+      </p>
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+      <p>
+        ⏱️{" "}
+        {language === "he"
+          ? `זמן שנותר: ${timeLeft} שניות`
+          : `Time Remaining: ${timeLeft}s`}
+      </p>
+
+      <div
+        style={{
+          width: "100%",
+          height: "12px",
+          backgroundColor: "#e5e7eb",
+          borderRadius: "999px",
+          marginBottom: "20px",
+        }}
+      >
+        <div
+          style={{
+            width: `${(currentQuestion / totalQuestions) * 100}%`,
+            height: "100%",
+            backgroundColor: "#2563eb",
+            borderRadius: "999px",
+            transition: "0.3s",
+          }}
+        />
+      </div>
+
+      <h2>{question}</h2>
+
+      <button onClick={speakQuestion}>
+        {language === "he" ? "השמעת השאלה" : "Read Question Aloud"}
+      </button>
+
+      <button onClick={startRecording} disabled={isRecording}>
+        {isRecording
+          ? language === "he"
+            ? "🎤 מקליט..."
+            : "🎤 Listening..."
+          : language === "he"
+          ? "התחלת הקלטה"
+          : "Start Recording"}
+      </button>
+
+      <br />
+      <br />
+
+      <textarea
+        rows={6}
+        cols={80}
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        placeholder={
+          language === "he"
+            ? "כתבי או הקליטי כאן את התשובה שלך..."
+            : "Type or record your answer here..."
+        }
+      />
+
+      <br />
+      <br />
+
+      <button onClick={nextQuestion}>
+        {isLastQuestion
+          ? language === "he"
+            ? "סיום ראיון"
+            : "Finish Interview"
+          : language === "he"
+          ? "השאלה הבאה"
+          : "Next Question"}
+      </button>
+    </div>
+  );
+}
+
+export default InterviewQuestion;

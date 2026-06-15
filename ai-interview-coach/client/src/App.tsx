@@ -23,6 +23,7 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [savedInterview, setSavedInterview] =
     useState<SavedInterview | null>(null);
+    const [language, setLanguage] = useState<"en" | "he">("en");
 
   const loadLastInterview = () => {
     const saved = localStorage.getItem("lastInterview");
@@ -58,10 +59,11 @@ function App() {
 
       const questionsResponse = await axios.post(
         "http://localhost:5000/api/generate-questions",
-        {
-          fileName: uploadedFileName,
-          jobDescription,
-        }
+{
+  fileName: uploadedFileName,
+  jobDescription,
+  language,
+}
       );
 
       setQuestions(questionsResponse.data.questions.split("\n"));
@@ -119,11 +121,18 @@ function App() {
 
   return (
     <div className="app">
-      <h1>AI Interview Coach</h1>
+      <h1>{language === "en" ? "AI Interview Coach" : "מאמן ראיונות AI"}</h1>
 
+<button onClick={() => setLanguage(language === "en" ? "he" : "en")}>
+  {language === "en" ? "עברית" : "English"}
+</button>
       <div className="card">
         <textarea
-          placeholder="Paste job description here..."
+          placeholder={
+  language === "en"
+    ? "Paste job description here..."
+    : "הדביקי כאן תיאור משרה..."
+}
           rows={8}
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
@@ -145,11 +154,19 @@ function App() {
         <br />
         <br />
 
-        <button onClick={uploadCV} disabled={loading}>
-          {loading ? "Preparing Interview..." : "Upload CV"}
-        </button>
+<button onClick={uploadCV} disabled={loading}>
+  {loading
+    ? language === "en"
+      ? "Preparing Interview..."
+      : "מכין ראיון..."
+    : language === "en"
+    ? "Upload CV"
+    : "העלאת קורות חיים"}
+</button>
 
-        <button onClick={loadLastInterview}>View Last Interview</button>
+<button onClick={loadLastInterview}>
+  {language === "en" ? "View Last Interview" : "צפייה בראיון האחרון"}
+</button>
 
         <h3 className="message">{message}</h3>
       </div>
@@ -163,6 +180,7 @@ function App() {
           setAnswer={setAnswer}
           nextQuestion={nextQuestion}
           isLastQuestion={currentQuestion === questions.length - 1}
+          language={language}
         />
       )}
 
