@@ -2,11 +2,13 @@ import { useState } from "react";
 import axios from "axios";
 import InterviewQuestion from "./components/InterviewQuestion";
 import "./App.css";
+import { jsPDF } from "jspdf";
 
 type SavedInterview = {
   questions: string[];
   answers: string[];
   date: string;
+  language?: "en" | "he";
 };
 
 function App() {
@@ -23,7 +25,11 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [savedInterview, setSavedInterview] =
     useState<SavedInterview | null>(null);
-    const [language, setLanguage] = useState<"en" | "he">("en");
+  const [language, setLanguage] = useState<"en" | "he">("en");
+  const [history, setHistory] = useState<SavedInterview[]>([]);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+
+  const isHebrew = language === "he";
 
   const loadLastInterview = () => {
     const saved = localStorage.getItem("lastInterview");
@@ -31,14 +37,28 @@ function App() {
     if (saved) {
       setSavedInterview(JSON.parse(saved));
       setShowHistory(true);
+      setShowAllHistory(false);
+      setMessage("");
     } else {
-      setMessage("No saved interview found");
+      setMessage(isHebrew ? "לא נמצא ראיון שמור" : "No saved interview found");
     }
+  };
+
+  const loadInterviewHistory = () => {
+    const savedHistory = JSON.parse(
+      localStorage.getItem("interviewHistory") || "[]"
+    );
+
+    setHistory(savedHistory);
+    setShowAllHistory(true);
+    setShowHistory(false);
   };
 
   const uploadCV = async () => {
     if (!file) {
-      setMessage("Please choose a CV first");
+      setMessage(
+        isHebrew ? "בחרי קודם קובץ קורות חיים" : "Please choose a CV first"
+      );
       return;
     }
 
@@ -55,15 +75,15 @@ function App() {
 
       const uploadedFileName = uploadResponse.data.fileName;
 
-      setMessage(`Uploaded: ${file.name}`);
+      setMessage(isHebrew ? `הועלה: ${file.name}` : `Uploaded: ${file.name}`);
 
       const questionsResponse = await axios.post(
         "http://localhost:5000/api/generate-questions",
-{
-  fileName: uploadedFileName,
-  jobDescription,
-  language,
-}
+        {
+          fileName: uploadedFileName,
+          jobDescription,
+          language,
+        }
       );
 
       setQuestions(questionsResponse.data.questions.split("\n"));
@@ -73,9 +93,10 @@ function App() {
       setFinished(false);
       setFeedback("");
       setShowHistory(false);
+      setShowAllHistory(false);
     } catch (error) {
       console.error(error);
-      setMessage("Something went wrong");
+      setMessage(isHebrew ? "משהו השתבש" : "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -91,14 +112,23 @@ function App() {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     } else {
-      localStorage.setItem(
-        "lastInterview",
-        JSON.stringify({
-          questions,
-          answers: updatedAnswers,
-          date: new Date().toISOString(),
-        })
+      const newInterview: SavedInterview = {
+        questions,
+        answers: updatedAnswers,
+        date: new Date().toISOString(),
+        language,
+      };
+
+      const existingHistory = JSON.parse(
+        localStorage.getItem("interviewHistory") || "[]"
       );
+
+      localStorage.setItem(
+        "interviewHistory",
+        JSON.stringify([newInterview, ...existingHistory])
+      );
+
+      localStorage.setItem("lastInterview", JSON.stringify(newInterview));
 
       setFinished(true);
 
@@ -108,31 +138,71 @@ function App() {
           {
             questions,
             answers: updatedAnswers,
+            language,
           }
         );
 
         setFeedback(feedbackResponse.data.feedback);
       } catch (error) {
         console.error(error);
-        setFeedback("Could not generate feedback.");
+        setFeedback(
+          isHebrew ? "לא ניתן היה ליצור משוב." : "Could not generate feedback."
+        );
       }
     }
   };
 
-  return (
-    <div className="app">
-      <h1>{language === "en" ? "AI Interview Coach" : "מאמן ראיונות AI"}</h1>
+  const downloadReport = () => {
+    const doc = new jsPDF();
 
-<button onClick={() => setLanguage(language === "en" ? "he" : "en")}>
-  {language === "en" ? "עברית" : "English"}
-</button>
+    doc.setFontSize(20);
+    doc.text("AI Interview Report", 20, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Date: ${new Date().toLocaleString()}`, 20, 35);
+
+    let y = 50;
+
+    questions.forEach((question, index) => {
+      const cleanQuestion = isHebrew
+        ? `Question ${index + 1}`
+        : `Q${index + 1}: ${question}`;
+
+      const cleanAnswer = isHebrew
+        ? `Answer: ${answers[index] ? "Saved in app" : "No answer"}`
+        : `A: ${answers[index] || "No answer"}`;
+
+      doc.text(cleanQuestion, 20, y);
+      y += 10;
+
+      const splitAnswer = doc.splitTextToSize(cleanAnswer, 170);
+      doc.text(splitAnswer, 20, y);
+      y += splitAnswer.length * 8 + 10;
+
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    doc.save("Interview_Report.pdf");
+  };
+
+  return (
+    <div className="app" dir={isHebrew ? "rtl" : "ltr"}>
+      <h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
+
+      <button onClick={() => setLanguage(isHebrew ? "en" : "he")}>
+        {isHebrew ? "English" : "עברית"}
+      </button>
+
       <div className="card">
         <textarea
           placeholder={
-  language === "en"
-    ? "Paste job description here..."
-    : "הדביקי כאן תיאור משרה..."
-}
+            isHebrew
+              ? "הדביקי כאן תיאור משרה..."
+              : "Paste job description here..."
+          }
           rows={8}
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
@@ -141,32 +211,41 @@ function App() {
         <br />
         <br />
 
-        <input
-          type="file"
-          accept=".pdf"
-          onChange={(e) => {
-            if (e.target.files?.[0]) {
-              setFile(e.target.files[0]);
-            }
-          }}
-        />
+        <label className="file-upload">
+          {isHebrew ? "בחירת קובץ קורות חיים" : "Choose CV File"}
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                setFile(e.target.files[0]);
+              }
+            }}
+          />
+        </label>
 
-        <br />
-        <br />
+        <p>
+          {file ? file.name : isHebrew ? "לא נבחר קובץ" : "No file selected"}
+        </p>
 
-<button onClick={uploadCV} disabled={loading}>
-  {loading
-    ? language === "en"
-      ? "Preparing Interview..."
-      : "מכין ראיון..."
-    : language === "en"
-    ? "Upload CV"
-    : "העלאת קורות חיים"}
-</button>
+        <button onClick={uploadCV} disabled={loading}>
+          {loading
+            ? isHebrew
+              ? "מכין ראיון..."
+              : "Preparing Interview..."
+            : isHebrew
+            ? "העלאת קורות חיים"
+            : "Upload CV"}
+        </button>
 
-<button onClick={loadLastInterview}>
-  {language === "en" ? "View Last Interview" : "צפייה בראיון האחרון"}
-</button>
+        <button onClick={loadLastInterview}>
+          {isHebrew ? "צפייה בראיון האחרון" : "View Last Interview"}
+        </button>
+
+        <button onClick={loadInterviewHistory}>
+          {isHebrew ? "צפייה בכל הראיונות" : "View All Interviews"}
+        </button>
 
         <h3 className="message">{message}</h3>
       </div>
@@ -185,28 +264,40 @@ function App() {
       )}
 
       {finished && (
-        <div style={{ marginTop: "30px", textAlign: "left" }}>
-          <h2>Interview Complete</h2>
+        <div
+          style={{
+            marginTop: "30px",
+            textAlign: isHebrew ? "right" : "left",
+          }}
+        >
+          <h2>{isHebrew ? "הראיון הסתיים" : "Interview Complete"}</h2>
+
+          <button onClick={downloadReport}>
+            {isHebrew ? "הורדת דוח PDF" : "Download PDF Report"}
+          </button>
+
+          <br />
+          <br />
 
           <div className="stats">
             <div className="card stats-card">
-              <h3>Questions</h3>
+              <h3>{isHebrew ? "שאלות" : "Questions"}</h3>
               <h2>{questions.length}</h2>
             </div>
 
             <div className="card stats-card">
-              <h3>Answered</h3>
+              <h3>{isHebrew ? "נענו" : "Answered"}</h3>
               <h2>{answers.length}</h2>
             </div>
 
             <div className="card stats-card">
-              <h3>Status</h3>
-              <h2>Complete</h2>
+              <h3>{isHebrew ? "סטטוס" : "Status"}</h3>
+              <h2>{isHebrew ? "הושלם" : "Complete"}</h2>
             </div>
           </div>
 
           <div className="card">
-            <h3>Interview Feedback</h3>
+            <h3>{isHebrew ? "משוב ראיון" : "Interview Feedback"}</h3>
             <pre style={{ whiteSpace: "pre-wrap" }}>{feedback}</pre>
           </div>
 
@@ -220,14 +311,49 @@ function App() {
       )}
 
       {showHistory && savedInterview && (
-        <div style={{ marginTop: "30px", textAlign: "left" }}>
-          <h2>Last Interview</h2>
-          <p>Date: {new Date(savedInterview.date).toLocaleString()}</p>
+        <div
+          style={{
+            marginTop: "30px",
+            textAlign: isHebrew ? "right" : "left",
+          }}
+        >
+          <h2>{isHebrew ? "ראיון אחרון" : "Last Interview"}</h2>
+          <p>
+            {isHebrew ? "תאריך" : "Date"}:{" "}
+            {new Date(savedInterview.date).toLocaleString()}
+          </p>
 
           {savedInterview.questions.map((question, index) => (
             <div key={index} className="summary-card">
               <strong>{question}</strong>
               <p>{savedInterview.answers[index]}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showAllHistory && (
+        <div
+          style={{
+            marginTop: "30px",
+            textAlign: isHebrew ? "right" : "left",
+          }}
+        >
+          <h2>{isHebrew ? "היסטוריית ראיונות" : "Interview History"}</h2>
+
+          {history.length === 0 && (
+            <p>{isHebrew ? "אין עדיין ראיונות שמורים" : "No saved interviews yet"}</p>
+          )}
+
+          {history.map((interview, index) => (
+            <div key={index} className="summary-card">
+              <strong>{new Date(interview.date).toLocaleString()}</strong>
+
+              <p>
+                {isHebrew
+                  ? `${interview.questions.length} שאלות`
+                  : `${interview.questions.length} Questions`}
+              </p>
             </div>
           ))}
         </div>
