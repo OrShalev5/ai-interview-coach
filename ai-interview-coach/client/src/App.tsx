@@ -32,7 +32,7 @@ function App() {
     useState<SavedInterview | null>(null);
   const [interviewType, setInterviewType] = useState("general");
   const [showWelcome, setShowWelcome] = useState(true);
-
+const [theme, setTheme] = useState<"light" | "dark">("light");
   const isHebrew = language === "he";
 
   const loadLastInterview = () => {
@@ -204,12 +204,34 @@ setQuestions(cleanedQuestions);
 
 if (showWelcome) {
   return (
-    <div className="welcome-page" dir={isHebrew ? "rtl" : "ltr"}>
+    <div className={`welcome-page ${theme}`} dir={isHebrew ? "rtl" : "ltr"}>
       <h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
 
-      <button onClick={() => setLanguage(isHebrew ? "en" : "he")}>
-        {isHebrew ? "English" : "עברית"}
-      </button>
+<div className="top-controls">
+  <button
+    className="small-btn"
+    title={isHebrew ? "החלפת שפה" : "Change Language"}
+    onClick={() => setLanguage(isHebrew ? "en" : "he")}
+  >
+    🌐
+  </button>
+
+  <button
+    className="small-btn"
+    title={
+      theme === "light"
+        ? isHebrew
+          ? "מצב כהה"
+          : "Dark Mode"
+        : isHebrew
+        ? "מצב בהיר"
+        : "Light Mode"
+    }
+    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+  >
+    {theme === "light" ? "🌙" : "☀️"}
+  </button>
+</div>
 
 <p>
   {isHebrew
@@ -230,12 +252,30 @@ if (showWelcome) {
 }
 
 return (
-  <div className="app" dir={isHebrew ? "rtl" : "ltr"}>
-      <h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
+  <div className={`app ${theme}`} dir={isHebrew ? "rtl" : "ltr"}>
+<h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
 
-      <button onClick={() => setLanguage(isHebrew ? "en" : "he")}>
-        {isHebrew ? "English" : "עברית"}
-      </button>
+<div className="top-controls">
+  <button
+    className="small-btn"
+    title={isHebrew ? "החלפת שפה" : "Change Language"}
+    onClick={() => setLanguage(isHebrew ? "en" : "he")}
+  >
+    🌐
+  </button>
+
+  <button
+    className="small-btn"
+    title={
+      theme === "light"
+        ? (isHebrew ? "מצב כהה" : "Dark Mode")
+        : (isHebrew ? "מצב בהיר" : "Light Mode")
+    }
+    onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+  >
+    {theme === "light" ? "🌙" : "☀️"}
+  </button>
+</div>
 
       <div className="card">
         <textarea
