@@ -20,7 +20,7 @@ function App() {
   const [answer, setAnswer] = useState("");
   const [answers, setAnswers] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [savedInterview, setSavedInterview] =
@@ -28,6 +28,10 @@ function App() {
   const [language, setLanguage] = useState<"en" | "he">("en");
   const [history, setHistory] = useState<SavedInterview[]>([]);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [selectedInterview, setSelectedInterview] =
+    useState<SavedInterview | null>(null);
+  const [interviewType, setInterviewType] = useState("general");
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const isHebrew = language === "he";
 
@@ -38,6 +42,7 @@ function App() {
       setSavedInterview(JSON.parse(saved));
       setShowHistory(true);
       setShowAllHistory(false);
+      setSelectedInterview(null);
       setMessage("");
     } else {
       setMessage(isHebrew ? "לא נמצא ראיון שמור" : "No saved interview found");
@@ -52,6 +57,7 @@ function App() {
     setHistory(savedHistory);
     setShowAllHistory(true);
     setShowHistory(false);
+    setSelectedInterview(null);
   };
 
   const uploadCV = async () => {
@@ -83,10 +89,17 @@ function App() {
           fileName: uploadedFileName,
           jobDescription,
           language,
+          interviewType,
         }
       );
 
-      setQuestions(questionsResponse.data.questions.split("\n"));
+const cleanedQuestions = questionsResponse.data.questions
+  .split("\n")
+  .map((q: string) => q.trim())
+  .filter((q: string) => q.length > 0)
+  .slice(0, 10);
+
+setQuestions(cleanedQuestions);
       setCurrentQuestion(0);
       setAnswer("");
       setAnswers([]);
@@ -94,6 +107,7 @@ function App() {
       setFeedback("");
       setShowHistory(false);
       setShowAllHistory(false);
+      setSelectedInterview(null);
     } catch (error) {
       console.error(error);
       setMessage(isHebrew ? "משהו השתבש" : "Something went wrong");
@@ -188,8 +202,35 @@ function App() {
     doc.save("Interview_Report.pdf");
   };
 
+if (showWelcome) {
   return (
-    <div className="app" dir={isHebrew ? "rtl" : "ltr"}>
+    <div className="welcome-page" dir={isHebrew ? "rtl" : "ltr"}>
+      <h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
+
+      <button onClick={() => setLanguage(isHebrew ? "en" : "he")}>
+        {isHebrew ? "English" : "עברית"}
+      </button>
+
+<p>
+  {isHebrew
+    ? "העלי קורות חיים, הוסיפי תיאור משרה (לא חובה), והתאמני לראיון עבודה מותאם אישית. בסיום תקבלי משוב ודוח מסכם לשיפור הביצועים שלך."
+    : "Upload your CV, optionally add a job description, and practice a personalized interview. At the end you'll receive feedback and a report to help improve your interview skills."}
+</p>
+<ul>
+  <li>{isHebrew ? "✔ שאלות מותאמות לקורות החיים" : "✔ Questions tailored to your CV"}</li>
+  <li>{isHebrew ? "✔ תמיכה בעברית ובאנגלית" : "✔ English and Hebrew support"}</li>
+  <li>{isHebrew ? "✔ משוב אישי בסיום" : "✔ Personalized feedback"}</li>
+</ul>
+
+      <button onClick={() => setShowWelcome(false)}>
+        {isHebrew ? "התחלת ראיון" : "Start Interview"}
+      </button>
+    </div>
+  );
+}
+
+return (
+  <div className="app" dir={isHebrew ? "rtl" : "ltr"}>
       <h1>{isHebrew ? "מאמן ראיונות AI" : "AI Interview Coach"}</h1>
 
       <button onClick={() => setLanguage(isHebrew ? "en" : "he")}>
@@ -207,6 +248,39 @@ function App() {
           value={jobDescription}
           onChange={(e) => setJobDescription(e.target.value)}
         />
+
+        <br />
+        <br />
+
+        <select
+  value={interviewType}
+  onChange={(e) => setInterviewType(e.target.value)}
+>
+  <option value="general">
+    {isHebrew ? "ראיון כללי" : "General Interview"}
+  </option>
+  <option value="hr">
+    {isHebrew ? "ראיון HR" : "HR Interview"}
+  </option>
+  <option value="behavioral">
+    {isHebrew ? "ראיון התנהגותי" : "Behavioral Interview"}
+  </option>
+  <option value="technical">
+    {isHebrew ? "ראיון מקצועי / טכני" : "Professional / Technical Interview"}
+  </option>
+  <option value="customer-service">
+    {isHebrew ? "שירות לקוחות" : "Customer Service"}
+  </option>
+  <option value="sales">
+    {isHebrew ? "מכירות" : "Sales"}
+  </option>
+  <option value="finance">
+    {isHebrew ? "בנקאות / פיננסים" : "Banking / Finance"}
+  </option>
+  <option value="management">
+    {isHebrew ? "ניהול" : "Management"}
+  </option>
+</select>
 
         <br />
         <br />
@@ -296,10 +370,17 @@ function App() {
             </div>
           </div>
 
-          <div className="card">
-            <h3>{isHebrew ? "משוב ראיון" : "Interview Feedback"}</h3>
-            <pre style={{ whiteSpace: "pre-wrap" }}>{feedback}</pre>
-          </div>
+          {feedback && (
+  <div className="card">
+    <h2>
+      {isHebrew ? "ציון כללי" : "Overall Score"}:
+      {" "}
+      {feedback.overallScore}/10
+    </h2>
+
+    <p>{feedback.summary}</p>
+  </div>
+)}
 
           {questions.map((question, index) => (
             <div key={index} className="summary-card">
@@ -342,18 +423,39 @@ function App() {
           <h2>{isHebrew ? "היסטוריית ראיונות" : "Interview History"}</h2>
 
           {history.length === 0 && (
-            <p>{isHebrew ? "אין עדיין ראיונות שמורים" : "No saved interviews yet"}</p>
+            <p>
+              {isHebrew
+                ? "אין עדיין ראיונות שמורים"
+                : "No saved interviews yet"}
+            </p>
           )}
 
           {history.map((interview, index) => (
-            <div key={index} className="summary-card">
+            <div
+              key={index}
+              className="summary-card"
+              style={{ cursor: "pointer" }}
+              onClick={() => setSelectedInterview(interview)}
+            >
               <strong>{new Date(interview.date).toLocaleString()}</strong>
-
               <p>
                 {isHebrew
                   ? `${interview.questions.length} שאלות`
                   : `${interview.questions.length} Questions`}
               </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selectedInterview && (
+        <div className="card">
+          <h2>{isHebrew ? "פרטי ראיון" : "Interview Details"}</h2>
+
+          {selectedInterview.questions.map((question, index) => (
+            <div key={index} className="summary-card">
+              <strong>{question}</strong>
+              <p>{selectedInterview.answers[index]}</p>
             </div>
           ))}
         </div>
